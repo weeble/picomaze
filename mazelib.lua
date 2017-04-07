@@ -56,29 +56,6 @@ function grid(w,h)
    shl(ori,xbits+ybits)
   ))
  end
- g.nbrl = function(x,y)
-  -- neighbour links
-  n={}
-  if (x>0) add(n,g.encl(x-1,y,0))
-  if (x<w-1) add(n,g.encl(x,y,0))
-  if (y>0) add(n,g.encl(x,y-1,1))
-  if (y<h-1) add(n,g.encl(x,y,1))
-  return n
- end
- g.follow = function(x,y,l)
-  -- follow link
-  x2,y2,ori=g.dcdl(l)
-  if ori==0 then
-   if (y!=y2) return nil
-   if (x==x2) return x+1,y
-   if (x==x2+1) return x-1,y
-   return nil
-  end
-  if (x!=x2) return nil
-  if (y==y2) return x,y+1
-  if (y==y2+1) return x,y-1
-  return nil
- end
  g.alllinks = function()
   t={}
   for y=0,h-2 do
@@ -106,6 +83,21 @@ function maze(g)
  local cells={}
  for i=0,g.w*g.h-1 do
   cells[i]=0
+ end
+ m.haslink = function(l)
+  local x,y,ori=g.dcdl(l)
+  local v=cells[x+y*g.w]
+  return band(v,ori+1)!=0
+ end
+ m.alllinks = function(state)
+  if (state==nil) state=true
+  local ret={}
+  for l in all(g.alllinks()) do
+   if m.haslink(l)==state then
+    add(ret,l)
+   end
+  end
+  return ret
  end
  m.kruskal = function()
   local k={}
@@ -139,6 +131,42 @@ function maze(g)
   local links=g.alllinks()
   while #links>0 do
    kjoin(pickpop(links))
+  end
+ end
+ m.tighten=function(n)
+  local links=m.alllinks(false)
+  for i=1,n do
+    local l=pickpop(links)
+    local x,y,ori=g.dcdl(l)
+    local a=x+g.w*y
+    cells[a]=bor(cells[a],ori+1)
+  end
+ end
+ m.color=function(n)
+  local colors={}
+  local allcells={}
+  for i=0,g.w*g.h-1 do
+   allcells[i+1]=i
+  end
+  -- seeds
+  for i=0,n-1 do
+   while true do
+    local idx=flr(rnd(cells))
+    if colors[idx]==nil then
+     colors[idx]=i
+     break
+    end
+   end
+  end
+  while #allcells>0 do
+   local c=pickpop(allcells)
+   if colors[c]==nil then
+    -- get colored neighbours
+    -- if none, return to allcells
+    -- and continue
+    -- otherwise pick one
+    oops()
+   end
   end
  end
  m.draw=function()
