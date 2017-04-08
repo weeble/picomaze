@@ -168,17 +168,6 @@ floor=1
 tex_wall=tex_rock
 tex_floor=tex_tangle
 
-style1=52
-style2=36
-
-function _init()
- build_plt(plt_addr)
- setup_room(
-  dark_biome,
-  darker_biome,
-  forest_biome)
-end
-
 function setpal(idx)
  for i=0,7 do
   pal(i,sget(idx,i+8))
@@ -235,7 +224,7 @@ darker_biome={
  bort=thin_divs,
  walp=0,
  flop=1,
- borp=1
+ borp=14
 }
 
 function setup_room(
@@ -304,6 +293,10 @@ function setup_room(
  memcpy(0x6000,0x1400,0xc00)
 end
 
+-- We use sprites 0xb8..0xff
+-- for pre-baking the map tiles
+-- for room.
+
 -- wavt: wall/variant/tex
 -- flvt: floor/variant/tex
 main_wavt=0xb8
@@ -334,19 +327,15 @@ variants={
 function vspr(idx, x, y)
  local v=variants[idx] or idx
  if (flr(shr(x,3))+flr(shr(y,3)))%2==0 then
- --if rnd()>0.5 then
   idx=v
  end
  spr(idx,x,y)
 end
 
-room_seed=25
-
 function draw_map()
  pal()
  palt()
  palt(0,false)
- srand(room_seed)
  local v,q,ex
  for x=0,16 do
   for y=0,16 do
@@ -381,102 +370,11 @@ function draw_map()
     q=bxor(q,0xf)
    end
    ex=mget(x+19,y+1)
-   --ex=max(max(max(
-   -- mget(x+18,y),
-   -- mget(x+19,y),
-   -- mget(x+18,y+1),
-   -- mget(x+19,y+1))))
    if (ex==1) ex=main_bort
    if (ex==2) ex=ex1_bort
    if (ex==3) ex=ex2_bort
    spr(ex+q,
     x*8,y*8) 
-   
   end
  end
-end
-
-function _draw()
- draw_map()
- if (true) return
- pal()
- palt()
- palt(0, false)
- build_plt(plt_addr)
- rectfill(0,0,127,127,5)
- for x=0,16 do
-  for y=0,16 do
-   v=mget(x,y)
-   if v==wall then
-    
-    --sprite=
-    -- (v==36) and
-    -- 36 or 34
-    --if x<3 and sprite==34 then
-    -- sprite=52
-    --end
-    if true then
-     q=ccodemap4(36,52,x+18,y)
-     spr(wall_ex1+q,x*8-4,y*8-4)
-     --maskspr(
-     --   tex_wall+(x+y)%2,
-     --   tex_wall+(x+y)%2,
-     --   zig_masks+q,
-     --   x*8-4,y*8-4)
-     --spr(sprite+(x+y)%2,x*8-4,y*8-4)
-    end
-   else
-    if v==floor then
-     if true then
-      q=ccodemap4(36,52,x+18,y)
-      spr(floor_ex1+q,x*8-4,y*8-4)
-      --maskspr(
-      -- 36+(x+y)%2,
-      -- 48+(x+y)%2,
-      -- zig_masks+q,
-      -- x*8-4,y*8-4)
-     end
-    else
-     --q=ccodemap(36,52,x,y)
-     if x<3 then
-      sprite=52
-     else
-      sprite=34
-     end
-     --sprite=nil
-     maskspr(
-      36,sprite,box_masks+q,
-      x*8-4,y*8-4)
-    end 
-   end
-  end
- end
- palt()
- --borders
- for x=0,15 do
-  for y=0,15 do
-   v=mget(x,y)
-   q=ccodemap4(36,52,x,y)
-   if band(q,8)==8 then
-    q=bxor(q,0xf)
-   end
-   --print(q)
-   spr(big_divs+q,
-    x*8,y*8)
-  end
- end
- --maskspr(6,22,5,16,16)
- --for
- --q=ccodemap(36,52,4,2)
- --maskspr(36,52,box_masks+q,4*8,2*8)
- palt()
- palt(0,false)
- prerender(
-  tex_tangle,tex_rock,
-  6,8)
- memcpy(0x1200,0x6000,0x200)
- prerender(
-  tex_dirt,tex_grass,
-  7,5)
- memcpy(0x1400,0x6000,0x200)
 end
