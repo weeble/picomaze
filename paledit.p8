@@ -35,6 +35,11 @@ tex_tangle=8
 tex_rock=10
 tex_dirt=12
 
+all_tex={4,6,8,10,12,14,20,22}
+function rnd_tex()
+ return all_tex[rn(#all_tex)+1]
+end
+
 function ccode(tl,tr,bl,br)
  -- corder code
  return
@@ -177,6 +182,21 @@ function setpal(idx)
  end
 end
 
+function getunusedcol(palette)
+ local c=15
+ repeat
+  local ok=true
+  for i=0,3 do
+   if sget(palette,i+8)==c then
+    c-=1
+    ok=false
+   end
+  end
+ until ok
+ return c
+end
+
+
 function prerender(
  tex_a, tex_b,
  pal_a, pal_b)
@@ -194,6 +214,21 @@ function prerender(
  end
 end
 
+function rn(n)
+ return flr(rnd(n))
+end
+
+function rndbiome()
+ return {
+  walt=rnd_tex(),
+  flot=rnd_tex(),
+  bort=big_divs + 16*rn(3),
+  walp=rn(24),
+  flop=rn(24),
+  borp=rn(24)
+ }
+end
+
 ice_biome={
  walt=tex_rock,
  flot=tex_dirt,
@@ -209,7 +244,8 @@ dark_biome={
  bort=big_divs,
  walp=11,
  flop=0,
- borp=6
+ --borp=6
+ borp=rn(24)
 }
 
 forest_biome={
@@ -229,6 +265,10 @@ darker_biome={
  flop=1,
  borp=14
 }
+
+main_bordert=15
+ex1_bordert=15
+ex2_bordert=15
 
 function setup_room(
   biome_main,
@@ -274,6 +314,9 @@ function setup_room(
  setpal(biome_ex2.flop)
  spr(biome_ex2.flot+1,104,0)
  setpal(biome_main.borp)
+ main_bordert=
+  getunusedcol(biome_main.borp)
+ pal(3,main_bordert)
  for i=0,7 do
   spr(biome_main.bort+i,8*i,0)
  end
@@ -285,10 +328,16 @@ function setup_room(
  -- spr(biome_main.bort+i,8*i,0)
  --end
  setpal(biome_ex1.borp)
+ ex1_bordert=
+  getunusedcol(biome_main.borp)
+ pal(3,ex1_bordert)
  for i=0,7 do
   spr(biome_ex1.bort+i,8*i,0)
  end
  setpal(biome_ex2.borp)
+ ex2_bordert=
+  getunusedcol(biome_main.borp)
+ pal(3,ex2_bordert)
  for i=0,7 do
   spr(biome_ex2.bort+i,64+8*i,0)
  end
@@ -335,6 +384,41 @@ function vspr(idx, x, y)
  spr(idx,x,y)
 end
 
+function draw_borders(code, texbase, bordert)
+ local q,qq
+ palt(bordert,true)
+ for x=0,15 do
+  for y=0,15 do
+   q=ccodemap4(2,3,x,y)
+   qq=q
+   if band(q,8)==8 then
+    q=bxor(q,0xf)
+   end
+   ex=mget(x+19,y+1)
+   if ex==code and q>0 then
+    if qq>=12 and qq<=14 or qq==4 or qq==8 then
+     slow_shadow(72+q,x*8,y*8)
+    end
+    spr(texbase+q,
+     x*8,y*8) 
+   end
+  end
+ end
+end
+
+function slow_shadow(sidx,x,y)
+ local sx=8*(sidx%16)
+ local sy=8*flr(sidx/16)
+ for yy=0,7 do
+  for xx=0,7 do
+   local c=sget(xx+sx,yy+sy)
+   local d=pget(x+xx,y+yy)
+   c=sget(c,d+16)
+   pset(x+xx,y+yy,c)
+  end
+ end
+end
+
 function draw_map()
  pal()
  palt()
@@ -365,21 +449,26 @@ function draw_map()
   end
  end
  --borders
- palt(0,true)
- for x=0,15 do
-  for y=0,15 do
-   q=ccodemap4(2,3,x,y)
-   if band(q,8)==8 then
-    q=bxor(q,0xf)
-   end
-   ex=mget(x+19,y+1)
-   if (ex==1) ex=main_bort
-   if (ex==2) ex=ex1_bort
-   if (ex==3) ex=ex2_bort
-   spr(ex+q,
-    x*8,y*8) 
-  end
- end
+ draw_borders(1, main_bort, main_bordert)
+ draw_borders(2, ex1_bort, ex1_bordert)
+ draw_borders(3, ex2_bort, ex2_bordert)
+ --palt(bordert,true)
+ --for x=0,15 do
+ -- for y=0,15 do
+ --  q=ccodemap4(2,3,x,y)
+ --  if band(q,8)==8 then
+ --   q=bxor(q,0xf)
+ --  end
+ --  ex=mget(x+19,y+1)
+ --  if (ex==1) ex=main_bort
+ --  if (ex==2) ex=ex1_bort
+ --  if (ex==3) ex=ex2_bort
+ --  if q>0 then
+ --   spr(ex+q,
+ --    x*8,y*8) 
+ --  end
+ -- end
+ --end
 end
 
 function _init()
