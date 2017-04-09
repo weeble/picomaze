@@ -84,6 +84,7 @@ function test_maze()
  assert(#links==305)
  links=m.alllinks(false)
  assert(#links==175)
+ m.color(64)
  m.draw()
  printh('test_maze ok')
 end

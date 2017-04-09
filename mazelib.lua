@@ -81,6 +81,7 @@ end
 function maze(g)
  local m={}
  local cells={}
+ local colors={}
  for i=0,g.w*g.h-1 do
   cells[i]=0
  end
@@ -143,7 +144,6 @@ function maze(g)
   end
  end
  m.color=function(n)
-  local colors={}
   local allcells={}
   for i=0,g.w*g.h-1 do
    allcells[i+1]=i
@@ -151,7 +151,7 @@ function maze(g)
   -- seeds
   for i=0,n-1 do
    while true do
-    local idx=flr(rnd(cells))
+    local idx=flr(rnd(#cells))
     if colors[idx]==nil then
      colors[idx]=i
      break
@@ -161,11 +161,22 @@ function maze(g)
   while #allcells>0 do
    local c=pickpop(allcells)
    if colors[c]==nil then
-    -- get colored neighbours
-    -- if none, return to allcells
-    -- and continue
-    -- otherwise pick one
-    oops()
+    local ns={}
+    function nadd(nei,ori,lc)
+     if band(cells[lc],ori+1)!=0 then
+      add(ns,colors[nei])
+     end
+    end
+    local x,y=g.xy(c)
+    if (x>0) nadd(c-1,0,c-1)
+    if (y>0) nadd(c-g.w,1,c-g.w)
+    if (x<g.w-1) nadd(c+1,0,c)
+    if (y<g.h-1) nadd(c+g.w,1,c)
+    if #ns==0 then
+     add(allcells,c)
+    else
+     colors[c]=ns[flr(rnd(#ns))+1]
+    end
    end
   end
  end
@@ -174,7 +185,8 @@ function maze(g)
    local c=cells[i]
    local x,y=g.xy(i)
    x*=8 y*=8
-   rectfill(x+2,y+2,x+5,y+5,11)
+   rectfill(x+2,y+2,x+5,y+5,colors[i]%8+8)
+   rectfill(x+3,y+3,x+4,y+4,flr(colors[i]/8)+8)
    if c%2!=0 then
     rectfill(x+6,y+3,x+9,y+4,7)
    end
