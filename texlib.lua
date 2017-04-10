@@ -226,6 +226,15 @@ function rndbiome()
  }
 end
 
+biomes={}
+
+function genbiomes(seed)
+ if (seed!=nil) srand(seed)
+ for i=0,63 do
+  biomes[i]=rndbiome()
+ end
+end
+
 ice_biome={
  walt=tex_rock,
  flot=tex_dirt,
@@ -383,6 +392,8 @@ end
 
 function draw_borders(code, texbase, bordert)
  local q,qq
+ palt()
+ palt(0,false)
  palt(bordert,true)
  for x=0,15 do
   for y=0,15 do
@@ -414,6 +425,84 @@ function slow_shadow(sidx,x,y)
    pset(x+xx,y+yy,c)
   end
  end
+end
+
+function dice(lo,hi)
+ if (lo>=hi) return lo
+ return rn(hi-lo+1)+lo
+end
+
+function mrect(x1,y1,x2,y2,v)
+ for y=y1,y2 do
+  for x=x1,x2 do
+   mset(x,y,v)
+  end
+ end
+end
+
+seed_xlinks=77
+seed_ylinks=78
+
+function random_walls(maze,gx,gy)
+
+ local topx=flr(prng(9,seed_xlinks,gx,gy))+4
+ local topw=1
+ local botx=flr(prng(9,seed_xlinks,gx,gy+1))+4
+ local botw=1
+ local lefty=flr(prng(9,seed_ylinks,gx,gy))+4
+ local lefth=1
+ local righty=flr(prng(9,seed_ylinks,gx+1,gy))+4
+ local righth=1
+ local minx=min(topx-topw,botx-botw)
+ local maxx=max(topx+topw,botx+botw)
+ --local hminy=min(topx-topw,botx-botw)
+ --local hmaxy=max(topx+topw,botx+botw)
+ --minx=dice(1,minx)
+ --maxx=dice(maxx,15)
+
+ --local vminy=min(lefty-lefth,righty-righth)
+ --local vmaxy=max(lefty+lefth,righty+righth)
+ --miny=dice(1,miny)
+ --maxy=dice(maxy,15)
+ local miny=min(lefty-lefth,righty-righth)
+ local maxy=max(lefty+lefth,righty+righth)
+ minx=dice(2,minx)
+ maxx=dice(maxx,14)
+ miny=dice(2,miny)
+ maxy=dice(maxy,14)
+ local vert=((gx+gy)%2)==0
+
+ mrect(0,0,16,16,2)
+ mrect(18,0,18+17,17,1)
+ if maze.has(gx,gy-1,1) then
+  mrect(topx-topw,0,topx+topw,miny,1)
+  if vert then
+   mrect(18+topx-topw-1,0,18+topx+topw+2,3,2)
+   mrect(18+topx-topw,4,18+topx+topw+1,4,2)
+  end
+ end
+ if maze.has(gx,gy,1) then
+  mrect(botx-botw,maxy,botx+botw,16,1)
+  if vert then
+   mrect(18+botx-botw-1,14,18+botx+botw+2,17,3)
+   mrect(18+botx-botw,13,18+botx+botw+1,13,3)
+  end
+ end
+ if maze.has(gx-1,gy,0) then
+  mrect(0,lefty-lefth,minx,lefty+lefth,1)
+  if not vert then
+   mrect(18,lefty-lefth-1,18+3,lefty+lefth+2,2)
+   mrect(18+4,lefty-lefth,18+4,lefty+lefth+1,2)
+  end
+ end
+ if maze.has(gx,gy,0) then
+  mrect(maxx,righty-righth,16,righty+righth,1)
+  if not vert then
+   mrect(18+14,righty-righth-1,18+17,righty+righth+2,3)
+   mrect(18+13,righty-righth,18+13,righty+righth+1,3)
+  end
+ end
+ mrect(minx,miny,maxx,maxy,1)
 end
 
 function draw_map()

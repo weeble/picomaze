@@ -88,10 +88,25 @@ function maze(g)
  for i=0,g.w*g.h-1 do
   cells[i]=0
  end
+ m.g=g
  m.haslink = function(l)
   local x,y,ori=g.dcdl(l)
   local v=cells[x+y*g.w]
   return band(v,ori+1)!=0
+ end
+ m.has = function(x,y,ori)
+  if x<0 or x>=g.w then
+   return false
+  end
+  if y<0 or y>=g.h then
+   return false
+  end
+  return band(
+   cells[x+y*g.w],
+   ori+1) != 0
+ end
+ m.getcol = function(x,y)
+  return colors[x+y*g.w]
  end
  m.alllinks = function(state)
   if (state==nil) state=true
@@ -200,6 +215,17 @@ function maze(g)
  end
  return m
 end
+
+worldseed=1234
+
+function prng(n, ...)
+ srand(worldseed)
+ for s in all({...}) do
+  srand(rnd()+s)
+ end
+ return rnd(n)
+end
+
 function contains(arr, v)
  for x in all(arr) do
   if (x==v) return true

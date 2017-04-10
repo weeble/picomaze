@@ -1,6 +1,231 @@
 pico-8 cartridge // http://www.pico-8.com
 version 8
 __lua__
+function pickpop(a)
+ -- remove a random item from
+ -- the array and return it
+ -- does not preserve order
+ -- o(1)
+ local i=flr(rnd(#a))+1
+ local ret=a[i]
+ a[i]=a[#a]
+ a[#a]=nil
+ return ret
+end
+
+function logbits(x)
+ local v=0
+ x-=1
+ while x>0 do
+  x=band(0xffff,shr(x,1))
+  v+=1
+ end
+ return v
+end
+
+function getbits(x,shift,bits)
+ local bitmask=shl(1,bits)-1
+ return band(
+  bitmask,shr(x,shift))
+end
+
+function grid(w,h)
+ local xbits=logbits(w)
+ local ybits=logbits(h)
+ local g={["w"]=w,["h"]=h}
+ g.offs = function(x,y)
+  return x+y*w
+ end
+ g.xy = function(offs)
+  return offs%w,flr(offs/w)
+ end
+ g.dcdl = function(l)
+  -- decode link
+  return getbits(l,0,xbits),
+   getbits(l,xbits,ybits),
+   getbits(l,xbits+ybits,1)
+ end
+ g.spll = function(l)
+  -- split link
+  x,y,ori = g.dcdl(l)
+  return x,y,x+1-ori,y+ori,ori
+ end
+ g.encl = function(
+  -- encode link
+   x,y,ori)
+  return bor(
+   x,bor(
+   shl(y,xbits),
+   shl(ori,xbits+ybits)
+  ))
+ end
+ g.alllinks = function()
+  t={}
+  for y=0,h-2 do
+   for x=0,w-1 do
+    add(t,g.encl(x,y,1))
+   end
+  end
+  for y=0,h-1 do
+   for x=0,w-2 do
+    add(t,g.encl(x,y,0))
+   end
+  end
+  return t
+ end
+ g.prl = function(l)
+  --print link
+  x,y,ori = g.dcdl(l)
+  print(x..","..y.."/"..ori)
+ end
+ return g
+end
+
+function maze(g)
+ local m={}
+ local cells={}
+ local colors={}
+ for i=0,g.w*g.h-1 do
+  cells[i]=0
+ end
+ m.g=g
+ m.haslink = function(l)
+  local x,y,ori=g.dcdl(l)
+  local v=cells[x+y*g.w]
+  return band(v,ori+1)!=0
+ end
+ m.has = function(x,y,ori)
+  if x<0 or x>=g.w then
+   return false
+  end
+  if y<0 or y>=g.h then
+   return false
+  end
+  return band(
+   cells[x+y*g.w],
+   ori+1) != 0
+ end
+ m.getcol = function(x,y)
+  return colors[x+y*g.w]
+ end
+ m.alllinks = function(state)
+  if (state==nil) state=true
+  local ret={}
+  for l in all(g.alllinks()) do
+   if m.haslink(l)==state then
+    add(ret,l)
+   end
+  end
+  return ret
+ end
+ m.kruskal = function()
+  local k={}
+  function super(i)
+   local s=k[i]
+   if (s==nil) then
+    k[i]=i
+    return i
+   end
+   if (s==i) return s
+   k[i]=super(s)
+   return k[i]
+  end
+  function superxy(x,y)
+   return g.xy(
+    super(g.offs(x,y)))
+  end
+  function kjoin(l)
+   local x1,y1,x2,y2,ori=
+    g.spll(l)
+   local a=g.offs(x1,y1)
+   local b=g.offs(x2,y2)
+   local aa=super(a)
+   local bb=super(b)
+   if (aa==bb) return
+   --merge discrete sets
+   k[max(aa,bb)]=min(aa,bb)
+   --form link
+   cells[a]=bor(cells[a],ori+1)
+  end
+  local links=g.alllinks()
+  while #links>0 do
+   kjoin(pickpop(links))
+  end
+ end
+ m.tighten=function(n)
+  local links=m.alllinks(false)
+  for i=1,n do
+    local l=pickpop(links)
+    local x,y,ori=g.dcdl(l)
+    local a=x+g.w*y
+    cells[a]=bor(cells[a],ori+1)
+  end
+ end
+ m.color=function(n)
+  local allcells={}
+  for i=0,g.w*g.h-1 do
+   allcells[i+1]=i
+  end
+  -- seeds
+  for i=0,n-1 do
+   while true do
+    local idx=flr(rnd(#cells))
+    if colors[idx]==nil then
+     colors[idx]=i
+     break
+    end
+   end
+  end
+  while #allcells>0 do
+   local c=pickpop(allcells)
+   if colors[c]==nil then
+    local ns={}
+    function nadd(nei,ori,lc)
+     if band(cells[lc],ori+1)!=0 then
+      add(ns,colors[nei])
+     end
+    end
+    local x,y=g.xy(c)
+    if (x>0) nadd(c-1,0,c-1)
+    if (y>0) nadd(c-g.w,1,c-g.w)
+    if (x<g.w-1) nadd(c+1,0,c)
+    if (y<g.h-1) nadd(c+g.w,1,c)
+    if #ns==0 then
+     add(allcells,c)
+    else
+     colors[c]=ns[flr(rnd(#ns))+1]
+    end
+   end
+  end
+ end
+ m.draw=function()
+  for i=0,g.w*g.h-1 do
+   local c=cells[i]
+   local x,y=g.xy(i)
+   x*=8 y*=8
+   rectfill(x+2,y+2,x+5,y+5,colors[i]%8+8)
+   rectfill(x+3,y+3,x+4,y+4,flr(colors[i]/8)+8)
+   if c%2!=0 then
+    rectfill(x+6,y+3,x+9,y+4,7)
+   end
+   if band(c,2)!=0 then
+    rectfill(x+3,y+6,x+4,y+9,7)
+   end
+  end
+ end
+ return m
+end
+
+worldseed=1234
+
+function prng(n, ...)
+ srand(worldseed)
+ for s in all({...}) do
+  srand(rnd()+s)
+ end
+ return rnd(n)
+end
+
 --cornercode
 -- 0x1 = topleft
 -- 0x2 = topright
@@ -229,6 +454,15 @@ function rndbiome()
  }
 end
 
+biomes={}
+
+function genbiomes(seed)
+ if (seed!=nil) srand(seed)
+ for i=0,63 do
+  biomes[i]=rndbiome()
+ end
+end
+
 ice_biome={
  walt=tex_rock,
  flot=tex_dirt,
@@ -386,6 +620,8 @@ end
 
 function draw_borders(code, texbase, bordert)
  local q,qq
+ palt()
+ palt(0,false)
  palt(bordert,true)
  for x=0,15 do
   for y=0,15 do
@@ -417,6 +653,84 @@ function slow_shadow(sidx,x,y)
    pset(x+xx,y+yy,c)
   end
  end
+end
+
+function dice(lo,hi)
+ if (lo>=hi) return lo
+ return rn(hi-lo+1)+lo
+end
+
+function mrect(x1,y1,x2,y2,v)
+ for y=y1,y2 do
+  for x=x1,x2 do
+   mset(x,y,v)
+  end
+ end
+end
+
+seed_xlinks=77
+seed_ylinks=78
+
+function random_walls(maze,gx,gy)
+
+ local topx=flr(prng(9,seed_xlinks,gx,gy))+4
+ local topw=1
+ local botx=flr(prng(9,seed_xlinks,gx,gy+1))+4
+ local botw=1
+ local lefty=flr(prng(9,seed_ylinks,gx,gy))+4
+ local lefth=1
+ local righty=flr(prng(9,seed_ylinks,gx+1,gy))+4
+ local righth=1
+ local minx=min(topx-topw,botx-botw)
+ local maxx=max(topx+topw,botx+botw)
+ --local hminy=min(topx-topw,botx-botw)
+ --local hmaxy=max(topx+topw,botx+botw)
+ --minx=dice(1,minx)
+ --maxx=dice(maxx,15)
+
+ --local vminy=min(lefty-lefth,righty-righth)
+ --local vmaxy=max(lefty+lefth,righty+righth)
+ --miny=dice(1,miny)
+ --maxy=dice(maxy,15)
+ local miny=min(lefty-lefth,righty-righth)
+ local maxy=max(lefty+lefth,righty+righth)
+ minx=dice(2,minx)
+ maxx=dice(maxx,14)
+ miny=dice(2,miny)
+ maxy=dice(maxy,14)
+ local vert=((gx+gy)%2)==0
+
+ mrect(0,0,16,16,2)
+ mrect(18,0,18+17,17,1)
+ if maze.has(gx,gy-1,1) then
+  mrect(topx-topw,0,topx+topw,miny,1)
+  if vert then
+   mrect(18+topx-topw-1,0,18+topx+topw+2,3,2)
+   mrect(18+topx-topw,4,18+topx+topw+1,4,2)
+  end
+ end
+ if maze.has(gx,gy,1) then
+  mrect(botx-botw,maxy,botx+botw,16,1)
+  if vert then
+   mrect(18+botx-botw-1,14,18+botx+botw+2,17,3)
+   mrect(18+botx-botw,13,18+botx+botw+1,13,3)
+  end
+ end
+ if maze.has(gx-1,gy,0) then
+  mrect(0,lefty-lefth,minx,lefty+lefth,1)
+  if not vert then
+   mrect(18,lefty-lefth-1,18+3,lefty+lefth+2,2)
+   mrect(18+4,lefty-lefth,18+4,lefty+lefth+1,2)
+  end
+ end
+ if maze.has(gx,gy,0) then
+  mrect(maxx,righty-righth,16,righty+righth,1)
+  if not vert then
+   mrect(18+14,righty-righth-1,18+17,righty+righth+2,3)
+   mrect(18+13,righty-righth,18+13,righty+righth+1,3)
+  end
+ end
+ mrect(minx,miny,maxx,maxy,1)
 end
 
 function draw_map()
@@ -472,23 +786,102 @@ function draw_map()
 end
 
 function _init()
- build_plt(plt_addr)
+ --build_plt(plt_addr)
  --setup_room(
  -- dark_biome,
  -- darker_biome,
  -- forest_biome)
+ grd=grid(16,16)
+ world=maze(grd)
+ world.kruskal()
+ world.color(64)
+ genbiomes()
+ gx,gy=8,8
+ ux,uy=60,60
+ initroom()
+end
+
+function screenoff()
+ for i=0,15 do
+  pal(i,0,1)
+ end
+end
+
+function screenon()
+ for i=0,15 do
+  pal(i,i,1)
+ end
+end
+
+function initroom()
+ screenoff()
+ random_walls(world,gx,gy)
+ local bm=world.getcol(gx,gy)
+ local b1,b2
+ bm=biomes[bm]
+ local vert=((gx+gy)%2)==0
+ if vert then
+  b1=world.getcol(gx,gy-1) or 0
+  b2=world.getcol(gx,gy+1) or 0
+ else
+  b1=world.getcol(gx-1,gy) or 0
+  b2=world.getcol(gx+1,gy) or 0
+ end
+ b1=biomes[b1]
+ b2=biomes[b2]
  setup_room(
-  rndbiome(),
-  rndbiome(),
-  rndbiome())
+  bm,b1,b2)
+end
+
+function _update60()
+ local going=false
+ function go(dx,dy)
+   gx=mid(0,gx+dx,15)
+   gy=mid(0,gy+dy,15)
+   ux=mid(0,ux-200*dx,120)
+   uy=mid(0,uy-200*dy,120)
+   going=true
+ end
+ function wk(dx,dy)
+  ux+=dx
+  uy+=dy
+  local x1=flr((ux+4)/8)
+  local y1=flr((uy+4)/8)
+  if (dx>0) x1+=1
+  if (dy>0) y1+=1
+  local x2,y2=x1,y1
+  if (dx!=0) y2+=1
+  if (dy!=0) x2+=1
+  if mget(x1,y1)==2 or
+    mget(x2,y2)==2 then
+   ux-=dx
+   uy-=dy
+  end
+ end
+ if (btn(0)) wk(-1,0)
+ if (btn(1)) wk(1,0)
+ if (btn(2)) wk(0,-1)
+ if (btn(3)) wk(0,1)
+ if (ux>120) go(1,0)
+ if (ux<0) go(-1,0)
+ if (uy>120) go(0,1)
+ if (uy<0) go(0,-1)
+ if going then
+  initroom()
+ end
 end
 
 function _draw()
  draw_map()
+ slow_shadow(53,ux,uy)
+ palt(0,true)
+ spr(52,ux,uy-3)
+ palt(0,false)
  pal()
  palt()
  palt(0,false)
  --slow_shadow(73,72,72)
+ screenon()
 end
 __gfx__
 0000000088888880ccccccc0aaaaaaa0011110210111111100000000010000000000200100002001000201210002012111111111111100111111222200002222
@@ -515,14 +908,14 @@ __gfx__
 51000000000000000111222222221110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 65100000000000001122333333332211000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 7d100000000000001111222222221111000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-82100000000000000111111111111110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-92100000000000000001111111111000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-a4100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-b3100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-cd100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-d5100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-e2100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-f4100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+82100000000000000111111111111110000660000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+9210000000000000000111111111100000677d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+a410000000000000000000000000000000677d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+b3100000000000000000000000000000000dd0000111111000000000000000000000000000000000000000000000000000000000000000000000000000000000
+cd100000000000000000000000000000000880001333333100000000000000000000000000000000000000000000000000000000000000000000000000000000
+d510000000000000000000000000000000e882002333333200000000000000000000000000000000000000000000000000000000000000000000000000000000
+e210000000000000000000000000000000e882002222222200000000000000000000000000000000000000000000000000000000000000000000000000000000
+f410000000000000000000000000000000e882000111111000000000000000000000000000000000000000000000000000000000000000000000000000000000
 33333333333222333332222333333333333333333322233333322233333333330000000000000000000000000000000000000000000000000000000000000000
 33333333333222333332222333333333333333333322233333322233333333330000000000000000000000000000000000000000000000000000000000000000
 33333333330003333330003333003333333333333330003333000333333333000000000000000000000000000000000000000000000000000000000000000000
