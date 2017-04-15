@@ -9,6 +9,7 @@ function _init()
  grd=grid(16,16)
  world=maze(grd)
  world.kruskal()
+ world.tighten(32)
  world.color(64)
  genbiomes()
  gx,gy=8,8
@@ -60,17 +61,17 @@ function eject(a1,a2,b1,b2)
  end
  return a1+r,a2+r
 end
-function ejectwall(wx,wy)
+function ejectwall(wx,wy,ori)
  local hov=overlap(ux+4,ux+11,wx*8,wx*8+7)
  local vov=overlap(uy+4,uy+11,wy*8,wy*8+7)
  if (hov<=0) return
  if (vov<=0) return
- printh('hov:'..hov..' vov:'..vov)
- if hov<=vov then
+ ori=ori or hov<=vov
+ if ori==0 then
   ux=eject(ux+4,ux+11,wx*8,wx*8+7)-4
   return
  end
- if vov<=hov then
+ if ori==1 then
   uy=eject(uy+4,uy+11,wy*8,wy*8+7)-4
  end
 end
@@ -85,41 +86,25 @@ function _update60()
    going=true
  end
  function wk(dx,dy)
- printh('wk dx:'..dx..' dy:'..dy)
   ux+=dx
   uy+=dy
   local x1=flr((ux+4)/8)
   local y1=flr((uy+4)/8)
-  --if (dx>0) x1+=1
-  --if (dy>0) y1+=1
   local x2,y2=x1+1,y1+1
-  --if (dx!=0) y2+=1
-  --if (dy!=0) x2+=1
+  local ori=dy!=0 and 1 or 0
   
   if mget(x1,y1)==2 then
-   ejectwall(x1,y1)
+   ejectwall(x1,y1,ori)
   end
   if mget(x1,y2)==2 then
-   ejectwall(x1,y2)
+   ejectwall(x1,y2,ori)
   end
   if mget(x2,y1)==2 then
-   ejectwall(x2,y1)
+   ejectwall(x2,y1,ori)
   end
   if mget(x2,y2)==2 then
-   ejectwall(x2,y2)
+   ejectwall(x2,y2,ori)
   end
-
-  --if mget(x1,y1)==2 or
-  --  mget(x2,y2)==2 then
-  -- ejectwall(x1,y1) 
-   -- This isn't quite right.
-   -- Rather than prevent the
-   -- movement, should stop at
-   -- the limit of the space we
-   -- collide with.
-  -- ux-=dx
-  -- uy-=dy
-  --end
  end
  if (btn(0)) wk(-1,0)
  if (btn(1)) wk(1,0)

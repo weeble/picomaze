@@ -409,7 +409,7 @@ function clear_borders()
 end
 
 function bake_borders(code, texbase)
- local q,qq
+ local q
  for x=0,15 do
   for y=0,15 do
    q=ccodemap4(2,3,x,y)
@@ -436,52 +436,21 @@ shadow_tiles={
 }
 
 function draw_shadows()
- local q,qq
+ local q
  pal()
  palt(0,false)
  for x=0,15 do
   for y=0,15 do
    q=ccodemap4(2,3,x,y)
-   qq=q
-   --if band(q,8)==8 then
-   -- q=bxor(q,0xf)
-   --end
-   --ex=mget(x+19,y+1)
    if q>0 then
-    q=peek(sha2_addr+qq)
-    --shadow_tiles[qq]
+    q=peek(sha2_addr+q)
     if q>0 then
-      --if qq>=12 and qq<=14 or qq==4 or qq==8 then
      fast_shadow(72+q,x*8,y*8)
     end
    end
   end
  end
 end
-
---function draw_borders(code, texbase, bordert)
--- local q,qq
--- palt()
--- palt(0,false)
--- palt(bordert,true)
--- for x=0,15 do
---  for y=0,15 do
---   q=ccodemap4(2,3,x,y)
---   qq=q
---   if band(q,8)==8 then
---    q=bxor(q,0xf)
---   end
---   ex=mget(x+19,y+1)
---   if ex==code and q>0 then
---    if qq>=12 and qq<=14 or qq==4 or qq==8 then
---     slow_shadow(72+q,x*8,y*8)
---    end
---    spr(texbase+q,
---     x*8,y*8) 
---   end
---  end
--- end
---end
 
 function slow_shadow(sidx,x,y)
  local sx=8*(sidx%16)
@@ -490,7 +459,6 @@ function slow_shadow(sidx,x,y)
   for xx=0,7 do
    local c=sget(xx+sx,yy+sy)
    local d=pget(x+xx,y+yy)
-   --c=sget(c,d+16)
    c=peek(sha_addr+bor(d,shl(c,4)))
    pset(x+xx,y+yy,c)
   end
@@ -504,10 +472,10 @@ function fast_shadow(sidx,x,y)
  local paddr=0x6000+flr(x/2)+y*64
  -- The most outrageous hack of
  -- all here is that we start
- -- yy from 4 since none of our
+ -- yy from 3 since none of our
  -- shadow textures have content
- -- in the top half.
- for yy=4,7 do
+ -- in the top three rows.
+ for yy=3,7 do
   local ofs=yy*64
   for xx=0,3 do
    local cs=peek(saddr+ofs)
@@ -570,15 +538,6 @@ function random_walls(maze,gx,gy)
  local righth=1
  local minx=min(topx-topw,botx-botw)
  local maxx=max(topx+topw,botx+botw)
- --local hminy=min(topx-topw,botx-botw)
- --local hmaxy=max(topx+topw,botx+botw)
- --minx=dice(1,minx)
- --maxx=dice(maxx,15)
-
- --local vminy=min(lefty-lefth,righty-righth)
- --local vmaxy=max(lefty+lefth,righty+righth)
- --miny=dice(1,miny)
- --maxy=dice(maxy,15)
  local miny=min(lefty-lefth,righty-righth)
  local maxy=max(lefty+lefth,righty+righth)
  minx=dice(2,minx)
@@ -589,6 +548,15 @@ function random_walls(maze,gx,gy)
 
  mrect(0,0,16,16,2)
  mrect(18,0,18+17,17,1)
+
+ mrect(minx,miny,maxx,maxy,1)
+ prng(-1,seed_walls,gx,gy)
+ for i=0,7 do
+  local x=flr(rnd(maxx-minx+1))+minx
+  local y=flr(rnd(maxy-miny+1))+miny
+  mset(x,y,2)
+ end
+
  if maze.has(gx,gy-1,1) then
   mrect(topx-topw,0,topx+topw,miny,1)
   if vert then
@@ -616,13 +584,6 @@ function random_walls(maze,gx,gy)
    mrect(18+14,righty-righth-1,18+17,righty+righth+2,3)
    mrect(18+13,righty-righth,18+13,righty+righth+1,3)
   end
- end
- mrect(minx,miny,maxx,maxy,1)
- prng(-1,seed_walls,gx,gy)
- for i=0,7 do
-  local x=flr(rnd(maxx-minx+1))+minx
-  local y=flr(rnd(maxy-miny+1))+miny
-  mset(x,y,2)
  end
 end
 
