@@ -1,5 +1,6 @@
 
 function _init()
+ srand(1)
  --build_plt(plt_addr)
  --setup_room(
  -- dark_biome,
@@ -12,6 +13,7 @@ function _init()
  genbiomes()
  gx,gy=8,8
  ux,uy=60,60
+ init_fast_shadow(sha_addr)
  initroom()
 end
 
@@ -47,6 +49,32 @@ function initroom()
   bm,b1,b2)
 end
 
+function overlap(a1,a2,b1,b2)
+ return min(a2,b2)-max(a1,b1)+1
+end
+function eject(a1,a2,b1,b2)
+ local l=a2-b1+1
+ local r=b2-a1+1
+ if l<r then
+  return a1-l,a2-l
+ end
+ return a1+r,a2+r
+end
+function ejectwall(wx,wy)
+ local hov=overlap(ux+4,ux+11,wx*8,wx*8+7)
+ local vov=overlap(uy+4,uy+11,wy*8,wy*8+7)
+ if (hov<=0) return
+ if (vov<=0) return
+ printh('hov:'..hov..' vov:'..vov)
+ if hov<=vov then
+  ux=eject(ux+4,ux+11,wx*8,wx*8+7)-4
+  return
+ end
+ if vov<=hov then
+  uy=eject(uy+4,uy+11,wy*8,wy*8+7)-4
+ end
+end
+
 function _update60()
  local going=false
  function go(dx,dy)
@@ -57,20 +85,41 @@ function _update60()
    going=true
  end
  function wk(dx,dy)
+ printh('wk dx:'..dx..' dy:'..dy)
   ux+=dx
   uy+=dy
   local x1=flr((ux+4)/8)
   local y1=flr((uy+4)/8)
-  if (dx>0) x1+=1
-  if (dy>0) y1+=1
-  local x2,y2=x1,y1
-  if (dx!=0) y2+=1
-  if (dy!=0) x2+=1
-  if mget(x1,y1)==2 or
-    mget(x2,y2)==2 then
-   ux-=dx
-   uy-=dy
+  --if (dx>0) x1+=1
+  --if (dy>0) y1+=1
+  local x2,y2=x1+1,y1+1
+  --if (dx!=0) y2+=1
+  --if (dy!=0) x2+=1
+  
+  if mget(x1,y1)==2 then
+   ejectwall(x1,y1)
   end
+  if mget(x1,y2)==2 then
+   ejectwall(x1,y2)
+  end
+  if mget(x2,y1)==2 then
+   ejectwall(x2,y1)
+  end
+  if mget(x2,y2)==2 then
+   ejectwall(x2,y2)
+  end
+
+  --if mget(x1,y1)==2 or
+  --  mget(x2,y2)==2 then
+  -- ejectwall(x1,y1) 
+   -- This isn't quite right.
+   -- Rather than prevent the
+   -- movement, should stop at
+   -- the limit of the space we
+   -- collide with.
+  -- ux-=dx
+  -- uy-=dy
+  --end
  end
  if (btn(0)) wk(-1,0)
  if (btn(1)) wk(1,0)
@@ -88,7 +137,7 @@ end
 function _draw()
  draw_map()
  slow_shadow(53,ux,uy)
- palt(0,true)
+ pal()
  spr(52,ux,uy-3)
  palt(0,false)
  pal()
@@ -96,4 +145,5 @@ function _draw()
  palt(0,false)
  --slow_shadow(73,72,72)
  screenon()
+ print(stat(1),0,0,7)
 end

@@ -28,6 +28,8 @@ wall_divs=96
 box_masks=112
 zig_masks=128
 plt_addr=0x5000 -- to 0x50ff
+sha_addr=0x5100 -- to 0x51ff
+sha2_addr=0x5200 -- to 0x520f
 
 tex_stone=4
 tex_grass=6
@@ -182,14 +184,16 @@ function setpal(idx)
  end
 end
 
-function getunusedcol(palette)
+function getunusedcol(pal1,pal2,pal3)
  local c=15
  repeat
   local ok=true
   for i=0,3 do
-   if sget(palette,i+8)==c then
-    c-=1
-    ok=false
+   for p in all({pal1,pal2,pal3}) do
+    if sget(p,i+8)==c then
+     c-=1
+     ok=false
+    end
    end
   end
  until ok
@@ -324,7 +328,10 @@ function setup_room(
  spr(biome_ex2.flot+1,104,0)
  setpal(biome_main.borp)
  main_bordert=
-  getunusedcol(biome_main.borp)
+  getunusedcol(
+   biome_main.borp,
+   biome_ex1.borp,
+   biome_ex2.borp)
  pal(3,main_bordert)
  for i=0,7 do
   spr(biome_main.bort+i,8*i,0)
@@ -332,26 +339,23 @@ function setup_room(
  memcpy(0x1600,0x6000,0x200)
 
  rectfill(0,0,127,7,0)
- --setpal(biome_main.borp)
- --for i=0,7 do
- -- spr(biome_main.bort+i,8*i,0)
- --end
  setpal(biome_ex1.borp)
- ex1_bordert=
-  getunusedcol(biome_main.borp)
- pal(3,ex1_bordert)
+ pal(3,main_bordert)
  for i=0,7 do
   spr(biome_ex1.bort+i,8*i,0)
  end
  setpal(biome_ex2.borp)
- ex2_bordert=
-  getunusedcol(biome_main.borp)
- pal(3,ex2_bordert)
+ pal(3,main_bordert)
  for i=0,7 do
   spr(biome_ex2.bort+i,64+8*i,0)
  end
  memcpy(0x1400,0x6000,0x200)
  memcpy(0x6000,0x1400,0xc00)
+ bake_map()
+ clear_borders()
+ bake_borders(1, main_bort)
+ bake_borders(2, ex1_bort)
+ bake_borders(3, ex2_bort)
 end
 
 -- We use sprites 0xb8..0xff
@@ -393,29 +397,91 @@ function vspr(idx, x, y)
  spr(idx,x,y)
 end
 
-function draw_borders(code, texbase, bordert)
+function pickv(idx, x, y)
+ if (x+y)%2==0 then
+  return variants[idx] or idx
+ end
+ return idx
+end
+
+function clear_borders()
+ mrect(54,0,54+16,16,0)
+end
+
+function bake_borders(code, texbase)
  local q,qq
- palt()
- palt(0,false)
- palt(bordert,true)
  for x=0,15 do
   for y=0,15 do
    q=ccodemap4(2,3,x,y)
-   qq=q
    if band(q,8)==8 then
     q=bxor(q,0xf)
    end
    ex=mget(x+19,y+1)
    if ex==code and q>0 then
-    if qq>=12 and qq<=14 or qq==4 or qq==8 then
-     slow_shadow(72+q,x*8,y*8)
-    end
-    spr(texbase+q,
-     x*8,y*8) 
+    mset(54+x,y,texbase+q)
    end
   end
  end
 end
+
+
+shadow_tiles={
+ [4]=4,
+ [6]=4,
+ [8]=7,
+ [9]=7,
+ [12]=3,
+ [13]=2,
+ [14]=1
+}
+
+function draw_shadows()
+ local q,qq
+ pal()
+ palt(0,false)
+ for x=0,15 do
+  for y=0,15 do
+   q=ccodemap4(2,3,x,y)
+   qq=q
+   --if band(q,8)==8 then
+   -- q=bxor(q,0xf)
+   --end
+   --ex=mget(x+19,y+1)
+   if q>0 then
+    q=peek(sha2_addr+qq)
+    --shadow_tiles[qq]
+    if q>0 then
+      --if qq>=12 and qq<=14 or qq==4 or qq==8 then
+     fast_shadow(72+q,x*8,y*8)
+    end
+   end
+  end
+ end
+end
+
+--function draw_borders(code, texbase, bordert)
+-- local q,qq
+-- palt()
+-- palt(0,false)
+-- palt(bordert,true)
+-- for x=0,15 do
+--  for y=0,15 do
+--   q=ccodemap4(2,3,x,y)
+--   qq=q
+--   if band(q,8)==8 then
+--    q=bxor(q,0xf)
+--   end
+--   ex=mget(x+19,y+1)
+--   if ex==code and q>0 then
+--    if qq>=12 and qq<=14 or qq==4 or qq==8 then
+--     slow_shadow(72+q,x*8,y*8)
+--    end
+--    spr(texbase+q,
+--     x*8,y*8) 
+--   end
+--  end
+-- end
+--end
 
 function slow_shadow(sidx,x,y)
  local sx=8*(sidx%16)
@@ -424,9 +490,54 @@ function slow_shadow(sidx,x,y)
   for xx=0,7 do
    local c=sget(xx+sx,yy+sy)
    local d=pget(x+xx,y+yy)
-   c=sget(c,d+16)
+   --c=sget(c,d+16)
+   c=peek(sha_addr+bor(d,shl(c,4)))
    pset(x+xx,y+yy,c)
   end
+ end
+end
+
+function fast_shadow(sidx,x,y)
+ local sx=8*(sidx%16)
+ local sy=8*flr(sidx/16)
+ local saddr=flr(sx/2)+sy*64
+ local paddr=0x6000+flr(x/2)+y*64
+ -- The most outrageous hack of
+ -- all here is that we start
+ -- yy from 4 since none of our
+ -- shadow textures have content
+ -- in the top half.
+ for yy=4,7 do
+  local ofs=yy*64
+  for xx=0,3 do
+   local cs=peek(saddr+ofs)
+   local ds=peek(paddr+ofs)
+   local clo=shl(band(cs,0x3),4)
+   local dlo=band(ds,0xf)
+   dlo=peek(bor(clo,dlo)+sha_addr)
+   local chi=band(cs,0xf0)
+   local dhi=shr(band(ds,0xf0),4)
+   dhi=peek(bor(chi,dhi)+sha_addr)
+   cs=bor(dlo,shl(dhi,4))
+   poke(paddr+ofs,cs)
+   ofs+=1
+  end
+ end
+
+end
+
+function init_fast_shadow(addr)
+ -- build lookup table for
+ -- palette to use fast_shadow
+ for c=0,3 do
+  for d=0,15 do
+   local result=sget(c,d+16)
+   poke(sha_addr+d+c*16,result)
+  end
+ end
+ memset(sha2_addr,16,0)
+ for idx,v in pairs(shadow_tiles) do
+  poke(sha2_addr+idx,v)
  end
 end
 
@@ -445,6 +556,7 @@ end
 
 seed_xlinks=77
 seed_ylinks=78
+seed_walls=79
 
 function random_walls(maze,gx,gy)
 
@@ -506,12 +618,15 @@ function random_walls(maze,gx,gy)
   end
  end
  mrect(minx,miny,maxx,maxy,1)
+ prng(-1,seed_walls,gx,gy)
+ for i=0,7 do
+  local x=flr(rnd(maxx-minx+1))+minx
+  local y=flr(rnd(maxy-miny+1))+miny
+  mset(x,y,2)
+ end
 end
 
-function draw_map()
- pal()
- palt()
- palt(0,false)
+function bake_map()
  local v,q,ex
  for x=0,16 do
   for y=0,16 do
@@ -521,43 +636,38 @@ function draw_map()
     q=bxor(0xf,q)
     if ex==0 then
      -- solid main wall
-     vspr(wall_ex1,x*8-4,y*8-4)
+     mset(x+36,y,pickv(wall_ex1,x,y))
     else
-     vspr(wall_ex1+q+16*(ex-1),x*8-4,y*8-4)
+     mset(x+36,y,pickv(wall_ex1+q+16*(ex-1),x,y))
     end
    else
     q,ex=ccodemap4(2,3,x+18,y)
     q=bxor(0xf,q)
     if ex==0 then
      -- solid main floor
-     vspr(floor_ex1,x*8-4,y*8-4)
+     mset(x+36,y,pickv(floor_ex1,x,y))
     else
-     vspr(floor_ex1+q+16*(ex-1),x*8-4,y*8-4)
+     mset(x+36,y,pickv(floor_ex1+q+16*(ex-1),x,y))
     end
    end
   end
  end
- --borders
- draw_borders(1, main_bort, main_bordert)
- draw_borders(2, ex1_bort, ex1_bordert)
- draw_borders(3, ex2_bort, ex2_bordert)
- --palt(bordert,true)
- --for x=0,15 do
- -- for y=0,15 do
- --  q=ccodemap4(2,3,x,y)
- --  if band(q,8)==8 then
- --   q=bxor(q,0xf)
- --  end
- --  ex=mget(x+19,y+1)
- --  if (ex==1) ex=main_bort
- --  if (ex==2) ex=ex1_bort
- --  if (ex==3) ex=ex2_bort
- --  if q>0 then
- --   spr(ex+q,
- --    x*8,y*8) 
- --  end
- -- end
- --end
+end
+
+function draw_map()
+ pal()
+ palt()
+ palt(0,false)
+ local v,q,ex
+ map(36,0,-4,-4,17,17)
+ draw_shadows()
+ pal()
+ palt(0,false)
+ palt(main_bordert,true)
+ map(54,0,0,0,16,16)
+ --draw_borders(1, main_bort, main_bordert)
+ --draw_borders(2, ex1_bort, main_bordert)
+ --draw_borders(3, ex2_bort, main_bordert)
 end
 
 function _init()
