@@ -176,7 +176,7 @@ tex_wall=tex_rock
 tex_floor=tex_tangle
 
 function setpal(idx)
- for i=0,7 do
+ for i=0,3 do
   pal(i,sget(idx,i+8))
  end
 end
@@ -226,7 +226,8 @@ function rndbiome()
   bort=big_divs + 16*rn(3),
   walp=rn(24),
   flop=rn(24),
-  borp=rn(24)
+  borp=rn(24),
+  wallstyle=rn(3)
  }
 end
 
@@ -450,6 +451,7 @@ function draw_shadows()
 end
 
 function slow_shadow(sidx,x,y)
+ -- Works anywhere
  local sx=8*(sidx%16)
  local sy=8*flr(sidx/16)
  for yy=0,7 do
@@ -463,10 +465,12 @@ function slow_shadow(sidx,x,y)
 end
 
 function fast_shadow(sidx,x,y)
- local sx=8*(sidx%16)
- local sy=8*flr(sidx/16)
- local saddr=flr(sx/2)+sy*64
- local paddr=0x6000+flr(x/2)+y*64
+ -- Does not range check - not
+ -- safe to use if it might
+ -- fall outside the screen.
+ -- Only for even x.
+ local saddr=sprofs(sidx)
+ local paddr=gfxofs(x,y)
  -- The most outrageous hack of
  -- all here is that we start
  -- yy from 3 since none of our
@@ -523,7 +527,76 @@ seed_xlinks=77
 seed_ylinks=78
 seed_walls=79
 
-function random_walls(maze,gx,gy)
+
+clockwise={
+ {0,-1},
+ {1,-1},
+ {1,0},
+ {1,1},
+ {0,1},
+ {-1,1},
+ {-1,0},
+ {-1,-1}
+}
+cardinal={
+ {0,-1},
+ {1,0},
+ {0,1},
+ {-1,0}
+}
+
+function cavernify(x,y,p)
+ -- toggle map cell iff it
+ -- won't affect topology
+ -- assumes all map values
+ -- are 1 or 2
+ function getneib(dir)
+  return mget(
+   x+dir[1],
+   y+dir[2])
+ end
+ local acc=0
+ local prev=getneib(
+  clockwise[
+   #clockwise])
+ for dir in all(clockwise) do
+  local v=getneib(dir)
+  if v!=prev then
+   acc+=1
+  end
+  prev=v
+ end
+ if (acc!=2) return
+ acc=0
+ local cell=mget(x,y)
+ for dir in all(cardinal) do
+  if getneib(dir)!=cell then
+   acc+=1
+  end
+ end
+ if (acc==0) return
+ if (acc==1 and dice(1,p)>1) return
+ --printh('x'..x..' y'..y..' := '..(3-cell))
+ mset(x,y,3-cell)
+end
+
+function pickitempos()
+ local x,y
+ while true do
+  x=dice(2,14)
+  y=dice(2,14)
+  if mget(x,y)==1 then
+   x=mid(3,x,13)
+   y=mid(3,y,13)
+   mrect(x-1,y-1,x+1,y+1,1)
+   return {x,y}
+  end
+ end
+end
+
+ctrl=800
+
+function random_walls(maze,gx,gy,walls)
 
  local topx=flr(prng(9,seed_xlinks,gx,gy))+4
  local topw=1
@@ -548,11 +621,11 @@ function random_walls(maze,gx,gy)
 
  mrect(minx,miny,maxx,maxy,1)
  prng(-1,seed_walls,gx,gy)
- for i=0,7 do
-  local x=flr(rnd(maxx-minx+1))+minx
-  local y=flr(rnd(maxy-miny+1))+miny
-  mset(x,y,2)
- end
+ --for i=0,7 do
+ -- local x=flr(rnd(maxx-minx+1))+minx
+ -- local y=flr(rnd(maxy-miny+1))+miny
+ -- mset(x,y,2)
+ --end
 
  if maze.has(gx,gy-1,1) then
   mrect(topx-topw,0,topx+topw,miny,1)
@@ -582,6 +655,15 @@ function random_walls(maze,gx,gy)
    mrect(18+13,righty-righth,18+13,righty+righth+1,3)
   end
  end
+
+ if walls>0 then
+  for i=0,((walls==2) and 800 or 100) do
+   cavernify(dice(2,14),dice(2,14),(walls==2) and 32 or 1)
+  end
+ end
+ local itempos=pickitempos()
+ gix=itempos[1]
+ giy=itempos[2]
 end
 
 function bake_map()
@@ -612,18 +694,18 @@ function bake_map()
  end
 end
 
-function draw_map()
+function draw_bg()
  pal()
  palt()
  palt(0,false)
- local v,q,ex
  map(36,0,-4,-4,17,17)
  draw_shadows()
+end
+
+function draw_fg()
  pal()
+ palt()
  palt(0,false)
  palt(main_bordert,true)
  map(54,0,0,0,16,16)
- --draw_borders(1, main_bort, main_bordert)
- --draw_borders(2, ex1_bort, main_bordert)
- --draw_borders(3, ex2_bort, main_bordert)
 end
