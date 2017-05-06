@@ -29,7 +29,7 @@ end
 function grid(w,h)
  local xbits=logbits(w)
  local ybits=logbits(h)
- local g={["w"]=w,["h"]=h}
+ local g={w=w,h=h}
  g.offs = function(x,y)
   return x+y*w
  end
