@@ -58,26 +58,8 @@ function pickpop(a)
  return ret
 end
 
-function logbits(x)
- local v=0
- x-=1
- while x>0 do
-  x=band(0xffff,shr(x,1))
-  v+=1
- end
- return v
-end
-
-function getbits(x,shift,bits)
- local bitmask=shl(1,bits)-1
- return band(
-  bitmask,shr(x,shift))
-end
-
 function grid(w,h)
  local wh=w*h
- --local xbits=logbits(w)
- --local ybits=logbits(h)
  local g={w=w,h=h}
  g.offs = function(x,y)
   return x+y*w
@@ -285,28 +267,6 @@ function test_pickpop()
  printh('test_pickpop ok')
 end
 
-function test_logbits()
- assert(logbits(1)==0)
- assert(logbits(2)==1)
- assert(logbits(3)==2)
- assert(logbits(4)==2)
- assert(logbits(5)==3)
- assert(logbits(7)==3)
- assert(logbits(8)==3)
- assert(logbits(9)==4)
- assert(logbits(16)==4)
- assert(logbits(17)==5)
- printh('test_logbits ok')
-end
-
-function test_getbits()
- assert(getbits(0x7d,0,4)==0xd)
- assert(getbits(0x7d,4,4)==0x7)
- assert(getbits(0x7d,8,4)==0)
- assert(getbits(0x7d,2,2)==0x3)
- printh('test_getbits ok')
-end
-
 function test_grid()
  local x,y,ori
  local g=grid(4,4)
@@ -363,8 +323,6 @@ end
 function _init()
  cls()
  test_pickpop()
- test_logbits()
- test_getbits()
  test_grid()
  test_maze()
 end

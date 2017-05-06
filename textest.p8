@@ -58,26 +58,8 @@ function pickpop(a)
  return ret
 end
 
-function logbits(x)
- local v=0
- x-=1
- while x>0 do
-  x=band(0xffff,shr(x,1))
-  v+=1
- end
- return v
-end
-
-function getbits(x,shift,bits)
- local bitmask=shl(1,bits)-1
- return band(
-  bitmask,shr(x,shift))
-end
-
 function grid(w,h)
  local wh=w*h
- --local xbits=logbits(w)
- --local ybits=logbits(h)
  local g={w=w,h=h}
  g.offs = function(x,y)
   return x+y*w

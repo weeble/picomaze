@@ -14,28 +14,6 @@ function test_pickpop()
  printh('test_pickpop ok')
 end
 
-function test_logbits()
- assert(logbits(1)==0)
- assert(logbits(2)==1)
- assert(logbits(3)==2)
- assert(logbits(4)==2)
- assert(logbits(5)==3)
- assert(logbits(7)==3)
- assert(logbits(8)==3)
- assert(logbits(9)==4)
- assert(logbits(16)==4)
- assert(logbits(17)==5)
- printh('test_logbits ok')
-end
-
-function test_getbits()
- assert(getbits(0x7d,0,4)==0xd)
- assert(getbits(0x7d,4,4)==0x7)
- assert(getbits(0x7d,8,4)==0)
- assert(getbits(0x7d,2,2)==0x3)
- printh('test_getbits ok')
-end
-
 function test_grid()
  local x,y,ori
  local g=grid(4,4)
@@ -92,8 +70,6 @@ end
 function _init()
  cls()
  test_pickpop()
- test_logbits()
- test_getbits()
  test_grid()
  test_maze()
 end
