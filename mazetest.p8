@@ -75,8 +75,9 @@ function getbits(x,shift,bits)
 end
 
 function grid(w,h)
- local xbits=logbits(w)
- local ybits=logbits(h)
+ local wh=w*h
+ --local xbits=logbits(w)
+ --local ybits=logbits(h)
  local g={w=w,h=h}
  g.offs = function(x,y)
   return x+y*w
@@ -86,9 +87,10 @@ function grid(w,h)
  end
  g.dcdl = function(l)
   -- decode link
-  return getbits(l,0,xbits),
-   getbits(l,xbits,ybits),
-   getbits(l,xbits+ybits,1)
+  return
+   l%w,
+   flr(l/w)%h,
+   flr(l/wh)
  end
  g.spll = function(l)
   -- split link
@@ -98,11 +100,7 @@ function grid(w,h)
  g.encl = function(
   -- encode link
    x,y,ori)
-  return bor(
-   x,bor(
-   shl(y,xbits),
-   shl(ori,xbits+ybits)
-  ))
+  return ori*wh+y*w+x
  end
  g.alllinks = function()
   t={}
