@@ -170,6 +170,10 @@ function nomaskcpy(
  end
 end
 
+function memspr(spr,go)
+ maskspr2(spr,nil,nil,go)
+end
+
 function maskspr2(
   spr1,spr2,mask,go)
  so1=sprofs(spr1)
@@ -197,49 +201,6 @@ function maskspr2(
  end
 end
 
-function maskspr(
-  spr1,spr2,mask,x,y)
- -- draw a sprite using a mask
- -- spr2 may be nil
- x=2*flr(x/2)
- go=gfxofs(x,y)
- so1=sprofs(spr1)
- if spr2==nil then
-  so2 = go
- else
-  so2 = sprofs(spr2)
- end
- mo = sprofs(mask)
- go = gfxofs(x,y)
- local dx,w,sy,ey=0,4,0,7
- if x<0 then
-  dx=-x/2
-  w+=x/2
- end
- if x>120 then
-  w-=(x-120)/2
- end
- if y<0 then
-  sy=-y
-  so1+=64*sy
-  so2+=64*sy
-  mo+=64*sy
-  go+=64*sy
- end
- if y>120 then
-  ey=127-y
- end
- for h=sy,ey do
-  maskcpy(
-   so1+dx,so2+dx,
-   mo+dx,go+dx,w)
-  so1+=64
-  so2+=64
-  mo+=64
-  go+=64
- end
-end
-
 function build_plt(addr)
  -- build lookup table for
  -- palette to use in maskspr
@@ -254,6 +215,11 @@ function build_plt(addr)
     bor(ca,cb))
   end
  end
+end
+
+function pal_switch(n)
+ setpal(n)
+ build_plt(plt_addr)
 end
 
 wall=2
@@ -285,22 +251,20 @@ end
 
 
 function prerender(
- tex_a, tex_b,
- pal_a, pal_b)
- setpal(pal_a)
- build_plt(plt_addr)
+  tex_a, tex_b,
+  pal_a, pal_b,
+  ptr_dest)
+ pal_switch(pal_a)
  for i=0,15 do
-  --spr(tex_a,i*8,0)
   maskspr2(tex_a,nil,nil,
-   gfxofs(i*8,0))
+   ptr_dest+i*4)
  end
- setpal(pal_b)
- build_plt(plt_addr)
+ pal_switch(pal_b)
  for i=0,15 do
   maskspr2(
    tex_b,nil,
    sprofs(zig_masks+i),
-   gfxofs(i*8,0))
+   ptr_dest+i*4)
  end
 end
 
@@ -308,8 +272,15 @@ function rn(n)
  return flr(rnd(n))
 end
 
+function mkbiome(b)
+ b.w={t=b.walt,p=b.walp}
+ b.f={t=b.flot,p=b.flop}
+ b.b={t=b.bort,p=b.borp}
+ return b
+end
+
 function rndbiome()
- return {
+ return mkbiome {
   walt=rnd_tex(),
   flot=rnd_tex(),
   bort=big_divs + 16*rn(3),
@@ -370,6 +341,14 @@ main_bordert=15
 ex1_bordert=15
 ex2_bordert=15
 
+function counter(c,d)
+ return function()
+  local r=c
+  c+=d
+  return r
+ end
+end
+
 function setup_room(
   biome_main,
   biome_ex1,
@@ -380,64 +359,73 @@ function setup_room(
   biome_main.walt,
   biome_ex1.walt,
   biome_main.walp,
-  biome_ex1.walp)
- memcpy(0x1800,0x6000,0x200)
+  biome_ex1.walp,
+  0x1800)
  prerender(
   biome_main.walt,
   biome_ex2.walt,
   biome_main.walp,
-  biome_ex2.walp)
- memcpy(0x1a00,0x6000,0x200)
+  biome_ex2.walp,
+  0x1a00)
  prerender(
   biome_main.flot,
   biome_ex1.flot,
   biome_main.flop,
-  biome_ex1.flop)
- memcpy(0x1c00,0x6000,0x200)
+  biome_ex1.flop,
+  0x1c00)
  prerender(
   biome_main.flot,
   biome_ex2.flot,
   biome_main.flop,
-  biome_ex2.flop)
- memcpy(0x1e00,0x6000,0x200)
- rectfill(0,0,127,7,0)
- setpal(biome_main.walp)
- spr(biome_main.walt+1,64,0)
- setpal(biome_main.flop)
- spr(biome_main.flot+1,72,0)
- setpal(biome_ex1.walp)
- spr(biome_ex1.walt+1,80,0)
- setpal(biome_ex1.flop)
- spr(biome_ex1.flot+1,88,0)
- setpal(biome_ex2.walp)
- spr(biome_ex2.walt+1,96,0)
- setpal(biome_ex2.flop)
- spr(biome_ex2.flot+1,104,0)
- setpal(biome_main.borp)
+  biome_ex2.flop,
+  0x1e00)
+ 
+ --rectfill(0,0,127,7,0)
+ memset(0x1600,0,0x200)
+ ptr_spr=counter(sprofs(main_wavt),4)
+ function do_variant(pt)
+  pal_switch(pt.p)
+  memspr(pt.t+1,ptr_spr())
+ end
+ do_variant(biome_main.w)
+ do_variant(biome_main.f)
+ do_variant(biome_ex1.w)
+ do_variant(biome_ex1.f)
+ do_variant(biome_ex2.w)
+ do_variant(biome_ex2.f)
+
+ pal_switch(biome_main.borp)
  main_bordert=
   getunusedcol(
    biome_main.borp,
    biome_ex1.borp,
    biome_ex2.borp)
  pal(3,main_bordert)
+ build_plt(plt_addr)
+ ptr_spr=counter(sprofs(main_bort),4)
  for i=0,7 do
-  spr(biome_main.bort+i,8*i,0)
+  memspr(biome_main.bort+i,ptr_spr())
  end
- memcpy(0x1600,0x6000,0x200)
 
- rectfill(0,0,127,7,0)
+ ptr_spr=counter(sprofs(ex1_bort),4)
+ memset(0x1400,0,0x200)
  setpal(biome_ex1.borp)
  pal(3,main_bordert)
+ build_plt(plt_addr)
  for i=0,7 do
-  spr(biome_ex1.bort+i,8*i,0)
+  memspr(biome_ex1.bort+i,ptr_spr())
  end
  setpal(biome_ex2.borp)
  pal(3,main_bordert)
+ build_plt(plt_addr)
  for i=0,7 do
-  spr(biome_ex2.bort+i,64+8*i,0)
+  memspr(biome_ex2.bort+i,ptr_spr())
  end
- memcpy(0x1400,0x6000,0x200)
- memcpy(0x6000,0x1400,0xc00)
+
+ --Uncomment to dump sprites
+ --back to screen
+ --memcpy(0x6000,0x1400,0xc00)
+
  bake_map()
  clear_borders()
  bake_borders(1, main_bort)
