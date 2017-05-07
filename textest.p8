@@ -364,6 +364,44 @@ function maskcpy(
  end
 end
 
+function nomaskcpy(
+  src1,src2,mask,dest,bytes)
+ for i=1,bytes do
+  s1=peek(
+   bor(plt_addr,peek(src1)))
+  poke(dest,s1)
+  src1+=1
+  dest+=1
+ end
+end
+
+function maskspr2(
+  spr1,spr2,mask,go)
+ so1=sprofs(spr1)
+ local mcpy=maskcpy
+ local mo=0
+ if mask==nil then
+  mcpy = nomaskcpy
+ else
+  mo=mask
+ end
+ if spr2==nil then
+  so2 = go
+ else
+  so2 = sprofs(spr2)
+ end
+ --sprofs(mask)
+ for h=0,7 do
+  mcpy(
+   so1,so2,
+   mo,go,4)
+  so1+=64
+  so2+=64
+  mo+=64
+  go+=64
+ end
+end
+
 function maskspr(
   spr1,spr2,mask,x,y)
  -- draw a sprite using a mask
@@ -455,16 +493,19 @@ function prerender(
  tex_a, tex_b,
  pal_a, pal_b)
  setpal(pal_a)
+ build_plt(plt_addr)
  for i=0,15 do
-  spr(tex_a,i*8,0)
+  --spr(tex_a,i*8,0)
+  maskspr2(tex_a,nil,nil,
+   gfxofs(i*8,0))
  end
  setpal(pal_b)
  build_plt(plt_addr)
  for i=0,15 do
-  maskspr(
+  maskspr2(
    tex_b,nil,
-   zig_masks+i,
-   i*8,0)
+   sprofs(zig_masks+i),
+   gfxofs(i*8,0))
  end
 end
 
