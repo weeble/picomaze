@@ -1,0 +1,6 @@
+All source code is licensed under the MIT license, found in the MIT.txt file.
+
+All sprites, maps, music and sound effects are licensed under the
+CC-BY-SA-4.0 license, found in the CCBYSA40.txt file.
+
+
